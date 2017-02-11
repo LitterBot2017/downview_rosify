@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from beginner_tutorials.msg import po 
+from downview_cam.msg import po 
 import numpy as np
 import cv2
 import math
@@ -11,8 +11,8 @@ frameWidth=1280
 frameHeight=720
 cameraFparm= 813.0
 cap = cv2.VideoCapture(1)
-cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, frameWidth)
-cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameHeight)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, frameWidth)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frameHeight)
 
 fgbg = cv2.BackgroundSubtractorMOG()
 #20  80
