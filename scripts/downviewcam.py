@@ -11,8 +11,8 @@ frameWidth=1280
 frameHeight=720
 cameraFparm= 813.0
 cap = cv2.VideoCapture(1)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, frameWidth)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frameHeight)
+cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, frameWidth)
+cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameHeight)
 
 fgbg = cv2.BackgroundSubtractorMOG()
 #20  80
@@ -24,19 +24,28 @@ distanceThreshold = 500
 historicalRectangles = []
 maxHistory = 5 # Remember only last five frames
 
-def pub_position(position):
 
-    pub = rospy.Publisher('po_chatter', po)
-    rospy.init_node('downviewcam', anonymous=True)                                                                 
-    rate = rospy.Rate(10) # 10hz
+# this function will publish the position coordiantes provided that 
+# the position is a positive pixel number
+def pub_position(position,pub):
+
+    centered_thres = 50
+
     msg = po()
-    msg.x = position[0]
-    msg.y = position[1]
-    msg.command = "Pick the obects"
-    while not rospy.is_shutdown():
-        rospy.loginfo(msg)
-        pub.publish(msg)
-        rate.sleep()
+
+    if (position[0] == -1) or (position[1] == -1):
+        msg.x = position[0]
+        msg.y = position[1]
+        msg.command = "not_detected"
+    else:
+        msg.x = position[0]
+        msg.y = position[1]
+        msg.command = "detected"
+        # if the can is sufficiently centered
+        if (abs(position[0]-frameWidth/2.0)<centered_thres) and (abs(position[1]-(frameHeight-frameHeight/4.0)/2.0)<centered_thres):
+            msg.command = 'centered'
+    # rospy.loginfo(msg)
+    pub.publish(msg)
 
 def deleteBackground(frame):
     return fgbg.apply(frame)
@@ -122,10 +131,18 @@ def anglefind(rectangle):
     return angle
 
 if __name__ == '__main__':
+
+    #initialize node stuff here
+    rospy.init_node('downviewcam', anonymous=True)
+
+    pub = rospy.Publisher('down_cam_msg', po)
+
+    rate = rospy.Rate(10) # 10hz
+
     try:
-        while (1):
+        while not rospy.is_shutdown():
             ret, origFrame = cap.read()
-            origFrame_cut = origFrame[0:360,:]
+            origFrame_cut = origFrame[0:500,:]
 
             if (ret == True):
                 frame = deleteBackground(origFrame_cut)
@@ -153,13 +170,14 @@ if __name__ == '__main__':
                   #angle=anglefind(mergedHistoricalRectanges[0])
                   #print(angle)
                   position=getRectangleCenter(mergedHistoricalRectanges[0])
-                  pub_position(position)
+                  pub_position(position, pub)
                   #if (position[0]>500) & (position[0]<800) &(position[1] > 300) &( position[1] < 420):
                       #print("stop!")
 
                       #pub_position(position)
                 else:
-                  position=None
+                  position= [-1]*2
+                  pub_position(position, pub)
 
                 frame = drawRectangles(origFrame_cut, mergedHistoricalRectanges)
                 #font = cv2.FONT_HERSHEY_SIMPLEX
@@ -169,6 +187,8 @@ if __name__ == '__main__':
             k = cv2.waitKey(30) & 0xff
             if k == 27:
                 break
+
+            rate.sleep()
 
         cap.release()
         cv2.destroyAllWindows()
