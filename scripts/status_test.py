@@ -16,11 +16,11 @@ cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameHeight)
 
 fgbg = cv2.BackgroundSubtractorMOG()
 #20  80
-itemWidthMin = 30
-itemHeightMin = 30
-itemWidthMax = 160
-itemHeightMax = 160
-distanceThreshold = 500
+itemWidthMin = 10
+itemHeightMin = 10
+itemWidthMax = 300
+itemHeightMax = 300
+distanceThreshold = 50
 historicalRectangles = []
 maxHistory = 5 # Remember only last five frames
 
@@ -41,8 +41,9 @@ def pub_position(position,pub):
         msg.x = position[0]
         msg.y = position[1]
         msg.command = "detected"
+        print "errors" + repr((abs(position[0]-frameWidth/2.0))) + " " + (repr((abs(position[1]-(500.0/2)))))
         # if the can is sufficiently centered
-        if (abs(position[0]-frameWidth/2.0)<centered_thres) and (abs(position[1]-500)<centered_thres): #500 is about the center of the new frame
+        if (abs(position[0]-frameWidth/2.0)<centered_thres) and (abs(position[1]-(500.0/2))<centered_thres):
             msg.command = 'centered'
     # rospy.loginfo(msg)
     pub.publish(msg)
@@ -55,11 +56,14 @@ def blurFrame(frame):
     return cv2.blur(frame, (blurSize, blurSize))
 
 def threshold(frame):
-    ret, frame = cv2.threshold(frame, 200, 255, cv2.THRESH_BINARY)
+    img_mean = np.mean(frame)
+    img_std = np.std(frame)
+    ret, frame = cv2.threshold(frame, img_mean-2*img_std, 255, cv2.THRESH_BINARY)
+    # frame = cv2.adaptiveThreshold(frame, 255, cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY_INV,21,2)
     return frame
 
 def getContours(frame):
-    contours, heirarchy = cv2.findContours(frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, heirarchy = cv2.findContours(frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     return contours
 
 def getRectangles(contours):
@@ -142,34 +146,50 @@ if __name__ == '__main__':
     try:
         while not rospy.is_shutdown():
             ret, origFrame = cap.read()
-            origFrame_cut = origFrame[0:500,:]
+            origFrame_cut = origFrame[0:480,:]
 
             if (ret == True):
-                frame = deleteBackground(origFrame_cut)
+                # frame = deleteBackground(origFrame_cut)
                 #frame = blurFrame(frame)
-                frame = threshold(frame)
-                contours = getContours(frame)
+                down_frame = cv2.pyrDown(origFrame_cut)
+                down_frame = cv2.pyrDown(down_frame)
+                down_frame = cv2.pyrMeanShiftFiltering(down_frame, 5, 75)
+                down_frame = cv2.pyrUp(down_frame)
+                down_frame = cv2.pyrUp(down_frame)
+                # frame = threshold(frame)
+                # cv2.imshow('down_frame_upped',down_frame)
+                down_frame = cv2.cvtColor(down_frame,cv2.cv.CV_RGB2GRAY)
+                # cv2.imshow('down_frame_upped',down_frame)
+                down_frame = threshold(down_frame)
+                cv2.imshow('down_frame_upped',down_frame)
+                
+                # contours = getContours(frame)
+                contours = getContours(down_frame)
+                # cv2.drawContours(down_frame, contours, -1, (0,255,0), 10)
+                # cv2.imshow('down_frame_upped',down_frame)
 
-                if len(historicalRectangles) == maxHistory:
-                    historicalRectangles = historicalRectangles[1:]
+                # if len(historicalRectangles) == maxHistory:
+                #     historicalRectangles = historicalRectangles[1:]
 
                 rectangles = getRectangles(contours)
                 rectangles = mergeRectangles(rectangles)
                 rectangles = filterBigRectangles(rectangles)
 
-                historicalRectangles.append(rectangles)
+                # historicalRectangles.append(rectangles)
 
-                mergedHistoricalRectanges = []
-                for rectangles in historicalRectangles:
-                    for rectangle in rectangles:
-                        mergedHistoricalRectanges.append(rectangle)
+                # mergedHistoricalRectanges = []
+                # for rectangles in historicalRectangles:
+                #     for rectangle in rectangles:
+                #         mergedHistoricalRectanges.append(rectangle)
 
-                mergedHistoricalRectanges = mergeRectangles(mergedHistoricalRectanges)
-                mergedHistoricalRectanges = filterBigRectangles(mergedHistoricalRectanges)
-                if len(mergedHistoricalRectanges) > 0:
+                # mergedHistoricalRectanges = mergeRectangles(mergedHistoricalRectanges)
+                # mergedHistoricalRectanges = filterBigRectangles(mergedHistoricalRectanges)
+                # if len(mergedHistoricalRectanges) > 0:
+                if len(rectangles) > 0:
                   #angle=anglefind(mergedHistoricalRectanges[0])
                   #print(angle)
-                  position=getRectangleCenter(mergedHistoricalRectanges[0])
+                  # position=getRectangleCenter(mergedHistoricalRectanges[0])
+                  position = getRectangleCenter(rectangles[0])
                   pub_position(position, pub)
                   #if (position[0]>500) & (position[0]<800) &(position[1] > 300) &( position[1] < 420):
                       #print("stop!")
@@ -179,10 +199,12 @@ if __name__ == '__main__':
                   position= [-1]*2
                   pub_position(position, pub)
 
-                frame = drawRectangles(origFrame_cut, mergedHistoricalRectanges)
+                # frame = drawRectangles(origFrame_cut, mergedHistoricalRectanges)
+                frame = drawRectangles(origFrame_cut, rectangles)
                 #font = cv2.FONT_HERSHEY_SIMPLEX
                 #cv2.putText(frame, repr(angle), (100, 130), font, 1, (200, 255, 155), 2, cv2.CV_AA)
                 cv2.imshow('frame', frame)
+                # cv2.imshow('frame',frame)
 
             k = cv2.waitKey(30) & 0xff
             if k == 27:
