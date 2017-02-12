@@ -10,7 +10,7 @@ import math
 frameWidth=1280
 frameHeight=720
 cameraFparm= 813.0
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(2)
 cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, frameWidth)
 cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, frameHeight)
 
