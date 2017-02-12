@@ -41,7 +41,7 @@ def pub_position(position,pub):
         msg.x = position[0]
         msg.y = position[1]
         msg.command = "detected"
-        print "errors" + repr((abs(position[0]-frameWidth/2.0))) + " " + (repr((abs(position[1]-(500.0/2)))))
+        # print "errors" + repr((abs(position[0]-frameWidth/2.0))) + " " + (repr((abs(position[1]-(500.0/2)))))
         # if the can is sufficiently centered
         if (abs(position[0]-frameWidth/2.0)<centered_thres) and (abs(position[1]-(500.0/2))<centered_thres):
             msg.command = 'centered'
